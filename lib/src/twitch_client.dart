@@ -8,16 +8,19 @@ import 'twitch_response.dart';
 
 import 'package:http/http.dart' as http;
 
-/// Allow to connect to the twitch api using a [clientId] and a [token].
-/// The [token] can be a appAccessToken or a userAccessToken or a OAuthAccessToken.
+/// Allow to connect to the twitch api using a [clientId] and a [appToken].
+/// The [appToken] can be a appAccessToken or a userAccessToken or a OAuthAccessToken.
 class TwitchClient {
   /// The client id used in the request.
   final String clientId;
 
   /// The access token used in the request.
-  final String token;
+  final String? appToken;
 
-  TwitchClient(this.clientId, this.token);
+  /// The OAuth token used in the request.
+  final String? userToken;
+
+  TwitchClient(this.clientId, {this.appToken, this.userToken});
 
   /// Starts a commercial on a specified channel.
   /// [broadcasterId] is the channel ID to start the commercial on.
@@ -795,6 +798,28 @@ class TwitchClient {
     return _handleResponse(response);
   }
 
+  /// Creates a clip programmatically.
+  /// This returns both an ID and an edit URL for the new clip.
+  /// [broadcasterId] The broadcaster's ID.
+  /// [hasDelay] If false, the clip is captured from the live stream when the API is called
+  Future<TwitchResponse> createClip(String broadcasterId,
+      {bool? hasDelay = false}) async {
+    final url = Uri.parse(
+        createUrl('/clips?broacaster_id=$broadcasterId&has_delay=$hasDelay'));
+
+    final response = await http.post(url, headers: _createHeaders());
+
+    return _handleResponse(response);
+  }
+
+  Future<TwitchResponse> getClip(
+      String broadcasterId, String gameId, List<String> ids,
+      {String? after,
+      String? before,
+      DateTime? endedAt,
+      int? first,
+      DateTime? startedAt}) async {}
+
   /// Gets information about one or more specified Twitch users.
   /// Users are identified by optional user [ids] and/or [logins] name.
   /// If neither a user ID nor a login name is specified, the user is looked up by Bearer token.
@@ -837,7 +862,7 @@ class TwitchClient {
   /// Create the headers for the request.
   Map<String, String> _createHeaders() => {
         'Client-ID': clientId,
-        'Authorization': 'Bearer $token',
+        'Authorization': 'Bearer $appToken',
         'Content-Type': 'application/json',
       };
 

@@ -13,7 +13,7 @@ void main() {
       final clientSecret = env['CLIENT_SECRET']!;
       final token = env['APP_ACCESS_TOKEN']!;
 
-      client = TwitchClient(clientId, token);
+      client = TwitchClient(clientId, appToken: token);
     });
 
     test('Get Extension Analytics', () async {
