@@ -1,5 +1,7 @@
-class TwitchApiRateLimitedException implements Exception {
-  final String message;
+import 'package:http/http.dart';
 
-  TwitchApiRateLimitedException(this.message) : super();
+class TwitchApiRateLimitedException implements Exception {
+  final Response response;
+
+  TwitchApiRateLimitedException(this.response) : super();
 }

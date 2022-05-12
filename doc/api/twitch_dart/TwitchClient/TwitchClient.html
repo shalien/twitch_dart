@@ -32,7 +32,7 @@
     <li><a href="../../index.html">twitch_dart</a></li>
     <li><a href="../../twitch_dart/twitch_dart-library.html">twitch_dart</a></li>
     <li><a href="../../twitch_dart/TwitchClient-class.html">TwitchClient</a></li>
-    <li class="self-crumb">TwitchClient factory constructor</li>
+    <li class="self-crumb">TwitchClient constructor</li>
   </ol>
   <div class="self-name">TwitchClient</div>
   <form class="search navbar-right" role="search">
@@ -51,7 +51,6 @@
 
     <section class="multi-line-signature">
       <span class="name ">TwitchClient</span>(<wbr><ol class="parameter-list"><li><span class="parameter" id="-param-clientId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">clientId</span>, </span></li>
-<li><span class="parameter" id="-param-clientSecret"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">clientSecret</span>, </span></li>
 <li><span class="parameter" id="-param-token"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">token</span></span></li>
 </ol>)
     </section>
@@ -62,8 +61,7 @@
     
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">factory TwitchClient(String clientId, String clientSecret, String token) =&gt;
-    createTwitchClient(clientId, clientSecret, token);</code></pre>
+  <pre class="language-dart"><code class="language-dart">TwitchClient(this.clientId, this.token);</code></pre>
 </section>
 
 
@@ -80,7 +78,7 @@
   <li><a href="../../index.html">twitch_dart</a></li>
   <li><a href="../../twitch_dart/twitch_dart-library.html">twitch_dart</a></li>
   <li><a href="../../twitch_dart/TwitchClient-class.html">TwitchClient</a></li>
-  <li class="self-crumb">TwitchClient factory constructor</li>
+  <li class="self-crumb">TwitchClient constructor</li>
 </ol>
 
 
@@ -94,17 +92,38 @@
     <li class="section-title">
       <a href="../../twitch_dart/TwitchClient-class.html#instance-properties">Properties</a>
     </li>
-    <li><a href="../../twitch_dart/TwitchClient/client.html">client</a></li>
     <li><a href="../../twitch_dart/TwitchClient/clientId.html">clientId</a></li>
-    <li><a href="../../twitch_dart/TwitchClient/clientSecret.html">clientSecret</a></li>
     <li class="inherited"><a href="https://api.flutter.dev/flutter/dart-core/Object/hashCode.html">hashCode</a></li>
     <li class="inherited"><a href="https://api.flutter.dev/flutter/dart-core/Object/runtimeType.html">runtimeType</a></li>
     <li><a href="../../twitch_dart/TwitchClient/token.html">token</a></li>
 
     <li class="section-title"><a href="../../twitch_dart/TwitchClient-class.html#instance-methods">Methods</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/createCustomReward.html">createCustomReward</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/deleteCustomReward.html">deleteCustomReward</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/getBitsLeaderboard.html">getBitsLeaderboard</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/getChannelChatBadges.html">getChannelChatBadges</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/getChannelEditors.html">getChannelEditors</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/getChannelEmotes.html">getChannelEmotes</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/getChannelInformation.html">getChannelInformation</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/getChatSettings.html">getChatSettings</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/getCheermotes.html">getCheermotes</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/getCustomReward.html">getCustomReward</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/getCustomRewardRedemption.html">getCustomRewardRedemption</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/getEmoteSets.html">getEmoteSets</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/getExtensionAnalytics.html">getExtensionAnalytics</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/getExtensionTransactions.html">getExtensionTransactions</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/getGameAnalytics.html">getGameAnalytics</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/getGlobalChatBadges.html">getGlobalChatBadges</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/getGlobalEmotes.html">getGlobalEmotes</a></li>
     <li><a href="../../twitch_dart/TwitchClient/getUsers.html">getUsers</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/modifyChannelInformation.html">modifyChannelInformation</a></li>
     <li class="inherited"><a href="https://api.flutter.dev/flutter/dart-core/Object/noSuchMethod.html">noSuchMethod</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/startCommercial.html">startCommercial</a></li>
     <li class="inherited"><a href="https://api.flutter.dev/flutter/dart-core/Object/toString.html">toString</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/updateChatSettings.html">updateChatSettings</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/updateCustomReward.html">updateCustomReward</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/updateCustomRewardRedemptions.html">updateCustomRewardRedemptions</a></li>
+    <li><a href="../../twitch_dart/TwitchClient/updateRedemptionStatus.html">updateRedemptionStatus</a></li>
 
     <li class="section-title inherited"><a href="../../twitch_dart/TwitchClient-class.html#operators">Operators</a></li>
     <li class="inherited"><a href="https://api.flutter.dev/flutter/dart-core/Object/operator_equals.html">operator ==</a></li>

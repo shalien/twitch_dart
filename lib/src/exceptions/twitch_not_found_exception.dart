@@ -1,5 +1,7 @@
-class TwitchNotFoundException implements Exception {
-  final String message;
+import 'package:http/http.dart';
 
-  TwitchNotFoundException(this.message) : super();
+class TwitchNotFoundException implements Exception {
+  final Response response;
+
+  TwitchNotFoundException(this.response) : super();
 }

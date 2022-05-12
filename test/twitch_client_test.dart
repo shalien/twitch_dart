@@ -1,4 +1,5 @@
 import 'package:dotenv/dotenv.dart';
+import 'package:twitch_dart/src/twitch_response.dart';
 import 'package:twitch_dart/twitch_dart.dart';
 import 'package:test/test.dart';
 
@@ -12,14 +13,25 @@ void main() {
       final clientSecret = env['CLIENT_SECRET']!;
       final token = env['APP_ACCESS_TOKEN']!;
 
-      client = TwitchClient(clientId, clientSecret, token);
+      client = TwitchClient(clientId, token);
+    });
+
+    test('Get Extension Analytics', () async {
+      try {
+        TwitchResponse response = await client.getExtensionAnalytics();
+        expect(response.data, isMap);
+      } catch (e) {
+        print(e.toString());
+        fail(e.toString());
+      }
     });
 
     test('Get users', () async {
-      final users =
-          await client.getUsers(logins: ['shalien', 'Moanatari2', 'saltybet']);
+      final response =
+          await client.getUsers(logins: ['shalien', 'moanatari2', 'saltybet']);
 
-      print(users);
+      print(
+          '${response.rateLimitLimit} ${response.rateLimitRemaining} ${response.rateLimitReset} ${response.data}');
     });
   });
 }

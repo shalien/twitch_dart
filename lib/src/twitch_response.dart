@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:http/http.dart';
 
 class TwitchResponse {
@@ -5,11 +7,17 @@ class TwitchResponse {
   final int rateLimitRemaining;
   final DateTime rateLimitReset;
 
-  final Response response;
+  final Response _response;
+  late final Map<String, dynamic> headers = _response.headers;
+  final dynamic data;
 
-  TwitchResponse.fromResponse(this.response)
-      : rateLimitLimit = int.parse(response.headers['ratelimit-limit']!),
+  bool get isSuccessful =>
+      _response.statusCode == 200 || _response.statusCode == 204;
+
+  TwitchResponse.fromResponse(this._response)
+      : rateLimitLimit = int.parse(_response.headers['ratelimit-limit']!),
         rateLimitRemaining =
-            int.parse(response.headers['ratelimit-remaining']!),
-        rateLimitReset = DateTime.parse(response.headers['ratelimit-reset']!);
+            int.parse(_response.headers['ratelimit-remaining']!),
+        rateLimitReset = DateTime.parse(_response.headers['ratelimit-reset']!),
+        data = json.decode(_response.body)['data'];
 }
