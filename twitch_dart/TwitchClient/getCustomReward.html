@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
-  <meta name="description" content="API docs for the getUsers method from the TwitchClient class, for the Dart programming language.">
-  <title>getUsers method - TwitchClient class - twitch_dart library - Dart API</title>
+  <meta name="description" content="API docs for the getCustomReward method from the TwitchClient class, for the Dart programming language.">
+  <title>getCustomReward method - TwitchClient class - twitch_dart library - Dart API</title>
 
 
   
@@ -32,9 +32,9 @@
     <li><a href="../../index.html">twitch_dart</a></li>
     <li><a href="../../twitch_dart/twitch_dart-library.html">twitch_dart</a></li>
     <li><a href="../../twitch_dart/TwitchClient-class.html">TwitchClient</a></li>
-    <li class="self-crumb">getUsers method</li>
+    <li class="self-crumb">getCustomReward method</li>
   </ol>
-  <div class="self-name">getUsers</div>
+  <div class="self-name">getCustomReward</div>
   <form class="search navbar-right" role="search">
     <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
   </form>
@@ -45,7 +45,7 @@
 
   <div id="dartdoc-main-content" class="main-content">
       <div>
-<h1><span class="kind-method">getUsers</span> method 
+<h1><span class="kind-method">getCustomReward</span> method 
     <a href="https://dart.dev/null-safety" class="feature feature-null-safety" title="Supports the null safety language feature.">Null safety</a>
 </h1></div>
 
@@ -53,8 +53,9 @@
       
 
 <span class="returntype"><a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">TwitchResponse</span>&gt;</span></span>
-<span class="name ">getUsers</span>(<wbr><ol class="parameter-list"><li><span class="parameter" id="getUsers-param-ids">{<span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>&gt;</span>?</span> <span class="parameter-name">ids</span>, </span></li>
-<li><span class="parameter" id="getUsers-param-logins"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>&gt;</span>?</span> <span class="parameter-name">logins</span>}</span></li>
+<span class="name ">getCustomReward</span>(<wbr><ol class="parameter-list"><li><span class="parameter" id="getCustomReward-param-broadcasterId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">broadcasterId</span>, </span></li>
+<li><span class="parameter" id="getCustomReward-param-id">{<span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a>?</span> <span class="parameter-name">id</span>, </span></li>
+<li><span class="parameter" id="getCustomReward-param-onlyManageableRewards"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a>?</span> <span class="parameter-name">onlyManageableRewards</span> = <span class="default-value">true</span>}</span></li>
 </ol>)
 
       
@@ -62,44 +63,27 @@
     </section>
     
 <section class="desc markdown">
-  <p>Gets information about one or more specified Twitch users.
-Users are identified by optional user <code>ids</code> and/or <code>logins</code> name.
-If neither a user ID nor a login name is specified, the user is looked up by Bearer token.
-<code>ids</code> User ID. Multiple user IDs can be specified. Limit: 100.
-<code>logins</code> User login name. Multiple user logins can be specified. Limit: 100.</p>
-<p>Note: The limit of 100 IDs and login names is the total limit.
-You can request, for example, 50 of each or 100 of one of them.
-You cannot request 100 of both.</p>
+  <p>Returns a list of Custom Reward objects for the Custom Rewards on a channel.
+<code>broadcasterId</code> The broadcaster's ID.
+<code>id</code> When used, this parameter filters the results and only returns reward objects for the Custom Rewards with matching ID. Maximum: 50
+<code>onlyManageableRewards</code> When set to true, only returns custom rewards that the calling <a href="../../twitch_dart/TwitchClient/clientId.html">clientId</a> can manage.</p>
 </section>
 
 
     
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">Future&lt;TwitchResponse&gt; getUsers(
-    {List&lt;String&gt;? ids, List&lt;String&gt;? logins}) async {
-  if (ids == null &amp;&amp; logins == null) {
-    throw ArgumentError(&#39;Either ids or logins must be specified&#39;);
-  }
+  <pre class="language-dart"><code class="language-dart">Future&lt;TwitchResponse&gt; getCustomReward(String broadcasterId,
+    {String? id, bool? onlyManageableRewards = true}) async {
+  final params = &lt;String, String&gt;{
+    ...id != null ? {&#39;id&#39;: id} : {},
+    ...onlyManageableRewards != null
+        ? {&#39;only_manageable_rewards&#39;: onlyManageableRewards.toString()}
+        : {},
+  };
 
-  if (ids != null &amp;&amp; ids.length &gt; 100) {
-    throw ArgumentError(&#39;Maximum number of users is 100&#39;);
-  }
-
-  if (logins != null &amp;&amp; logins.length &gt; 100) {
-    throw ArgumentError(&#39;Maximum number of users is 100&#39;);
-  }
-
-  if (ids != null &amp;&amp; logins != null &amp;&amp; ids.length + logins.length &gt; 100) {
-    throw ArgumentError(&#39;Maximum number of users is 100&#39;);
-  }
-
-  final param = [
-    ...ids != null ? ids.map((e) =&gt; &#39;id=$e&#39;).toList() : [],
-    ...logins != null ? logins.map((e) =&gt; &#39;login=$e&#39;).toList() : [],
-  ];
-
-  final url = Uri.parse(createUrl(&#39;users?${param.join(&#39;&amp;&#39;)}&#39;));
+  final url = Uri.parse(createUrl(
+      &#39;&#47;channels_points&#47;custom_rewards?broadcaster_id=$broadcasterId${params.isNotEmpty ? &#39;&amp;${params.keys.join(&#39;&amp;&#39;)}=${params.values.join(&#39;&amp;&#39;)}&#39; : &#39;&#39;}&#39;));
 
   final response = await http.get(url, headers: _createHeaders());
 
@@ -121,7 +105,7 @@ You cannot request 100 of both.</p>
   <li><a href="../../index.html">twitch_dart</a></li>
   <li><a href="../../twitch_dart/twitch_dart-library.html">twitch_dart</a></li>
   <li><a href="../../twitch_dart/TwitchClient-class.html">TwitchClient</a></li>
-  <li class="self-crumb">getUsers method</li>
+  <li class="self-crumb">getCustomReward method</li>
 </ol>
 
 

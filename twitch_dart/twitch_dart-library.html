@@ -65,15 +65,8 @@ Can be used in <code>dart:io</code> and <code>dart:html</code>.</p>
 
 </dt>
 <dd>
-  
-</dd>
-
-        <dt id="TwitchClientBase">
-  <span class="name "><a href="../twitch_dart/TwitchClientBase-class.html">TwitchClientBase</a></span> 
-
-</dt>
-<dd>
-  
+  Allow to connect to the twitch api using a <a href="../twitch_dart/TwitchClient/clientId.html">clientId</a> and a <a href="../twitch_dart/TwitchClient/token.html">token</a>.
+The <a href="../twitch_dart/TwitchClient/token.html">token</a> can be a appAccessToken or a userAccessToken or a OAuthAccessToken.
 </dd>
 
       </dl>
@@ -92,7 +85,7 @@ Can be used in <code>dart:io</code> and <code>dart:html</code>.</p>
 
 </dt>
 <dd>
-  
+  Twitch api url
   
 
   <div>
@@ -113,6 +106,50 @@ Can be used in <code>dart:io</code> and <code>dart:html</code>.</p>
 
 </dt>
 <dd>
+  Allow commercial time
+  <div class="features">read / write</div>
+
+</dd>
+
+        <dt id="nonModeratorChatDelayDurations" class="property">
+  <span class="name"><a href="../twitch_dart/nonModeratorChatDelayDurations.html">nonModeratorChatDelayDurations</a></span>
+  <span class="signature">&#8596; <a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>&gt;</span></span> 
+
+</dt>
+<dd>
+  
+  <div class="features">read / write</div>
+
+</dd>
+
+        <dt id="periods" class="property">
+  <span class="name"><a href="../twitch_dart/periods.html">periods</a></span>
+  <span class="signature">&#8596; <a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>&gt;</span></span> 
+
+</dt>
+<dd>
+  Allowed periods
+  <div class="features">read / write</div>
+
+</dd>
+
+        <dt id="sortCustomRewardRedemption" class="property">
+  <span class="name"><a href="../twitch_dart/sortCustomRewardRedemption.html">sortCustomRewardRedemption</a></span>
+  <span class="signature">&#8596; <a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>&gt;</span></span> 
+
+</dt>
+<dd>
+  
+  <div class="features">read / write</div>
+
+</dd>
+
+        <dt id="statusCustomRewardRedemption" class="property">
+  <span class="name"><a href="../twitch_dart/statusCustomRewardRedemption.html">statusCustomRewardRedemption</a></span>
+  <span class="signature">&#8596; <a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>&gt;</span></span> 
+
+</dt>
+<dd>
   
   <div class="features">read / write</div>
 
@@ -125,19 +162,6 @@ Can be used in <code>dart:io</code> and <code>dart:html</code>.</p>
       <h2>Functions</h2>
 
       <dl class="callables">
-        <dt id="createTwitchClient" class="callable">
-  <span class="name"><a href="../twitch_dart/createTwitchClient.html">createTwitchClient</a></span><span class="signature">(<wbr><span class="parameter" id="createTwitchClient-param-clientId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">clientId</span>, </span><span class="parameter" id="createTwitchClient-param-clientSecret"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">clientSecret</span>, </span><span class="parameter" id="createTwitchClient-param-token"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">token</span></span>)
-    <span class="returntype parameter">&#8594; <a href="../twitch_dart/TwitchClient-class.html">TwitchClient</a></span>
-  </span>
-  
-
-</dt>
-<dd>
-  
-  
-
-</dd>
-
         <dt id="createUrl" class="callable">
   <span class="name"><a href="../twitch_dart/createUrl.html">createUrl</a></span><span class="signature">(<wbr><span class="parameter" id="createUrl-param-path"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">path</span></span>)
     <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>
@@ -146,7 +170,7 @@ Can be used in <code>dart:io</code> and <code>dart:html</code>.</p>
 
 </dt>
 <dd>
-  
+  Format the url
   
 
 </dd>
@@ -207,7 +231,6 @@ Can be used in <code>dart:io</code> and <code>dart:html</code>.</p>
     <ol>
   <li class="section-title"><a href="../twitch_dart/twitch_dart-library.html#classes">Classes</a></li>
   <li><a href="../twitch_dart/TwitchClient-class.html">TwitchClient</a></li>
-  <li><a href="../twitch_dart/TwitchClientBase-class.html">TwitchClientBase</a></li>
 
 
 
@@ -216,9 +239,12 @@ Can be used in <code>dart:io</code> and <code>dart:html</code>.</p>
 
   <li class="section-title"><a href="../twitch_dart/twitch_dart-library.html#properties">Properties</a></li>
   <li><a href="../twitch_dart/commercialLengths.html">commercialLengths</a></li>
+  <li><a href="../twitch_dart/nonModeratorChatDelayDurations.html">nonModeratorChatDelayDurations</a></li>
+  <li><a href="../twitch_dart/periods.html">periods</a></li>
+  <li><a href="../twitch_dart/sortCustomRewardRedemption.html">sortCustomRewardRedemption</a></li>
+  <li><a href="../twitch_dart/statusCustomRewardRedemption.html">statusCustomRewardRedemption</a></li>
 
   <li class="section-title"><a href="../twitch_dart/twitch_dart-library.html#functions">Functions</a></li>
-  <li><a href="../twitch_dart/createTwitchClient.html">createTwitchClient</a></li>
   <li><a href="../twitch_dart/createUrl.html">createUrl</a></li>
 
 
