@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'dart:core';
 
 import 'package:http/http.dart';
+import 'exceptions/twitch_missing_token_exception.dart';
+import 'exceptions/twitch_response_exception.dart';
 
-import 'exceptions/twitch_api_rate_limited_exception.dart';
-import 'exceptions/twitch_not_found_exception.dart';
 import 'twitch_constants.dart';
 import 'twitch_response.dart';
 
@@ -17,7 +17,7 @@ enum TwitchClientType {
   user,
 
   /// Request will use the oauth token if available, otherwise the app token
-  none,
+  any,
 }
 
 /// Allow to connect to the twitch api using a [clientId] and a [appToken].
@@ -41,23 +41,32 @@ class TwitchClient {
   /// Internal type for the context switching
   TwitchClientType _internalType;
 
+  /// shorthand to check if any token is usable
+  bool get _hasAnyToken => appToken != null || userToken != null;
+
+  /// shorthand to check if the app token is usable
+  bool get _hasAppToken => appToken != null;
+
+  /// shorthand to check if the user token is usable
+  bool get _hasUserToken => userToken != null;
+
   /// Will create a new [TwitchClient] with the [clientId] and the [appToken] or/and [userToken].
   /// if both [appToken] and [userToken] are null, an exception will be raised.
   /// [type] Allow to force switching request to use either [TwitchClientType.app] or [TwitchClientType.user] by default.
-  /// If [TwitchClientType.none] is used, the client will use the [userToken] if available, otherwise the [appToken].
+  /// If [TwitchClientType.any] is used, the client will use the [userToken] if available, otherwise the [appToken].
   TwitchClient(this.clientId,
-      {this.appToken, this.userToken, this.type = TwitchClientType.none})
+      {this.appToken, this.userToken, this.type = TwitchClientType.any})
       : _internalType = type {
-    if (appToken == null && userToken == null) {
+    if (!_hasAppToken && !_hasUserToken) {
       throw ArgumentError('You must provide an appToken or a userToken');
     }
 
-    if (type == TwitchClientType.app && appToken == null) {
+    if (type == TwitchClientType.app && !_hasAppToken) {
       throw ArgumentError(
           'You must provide an appToken if you use the app type', 'appToken');
     }
 
-    if (type == TwitchClientType.user && userToken == null) {
+    if (type == TwitchClientType.user && !_hasUserToken) {
       throw ArgumentError(
           'You must provide an userToken if you use the user type',
           'userToken');
@@ -83,8 +92,8 @@ class TwitchClient {
   /// Desired [length] of the commercial in seconds. Valid options are 30, 60, 90, 120, 150, 180.
   Future<TwitchResponse> startCommercial(
       String broadcasterId, int length) async {
-    if (userToken == null) {
-      throw Exception('You need to provide a user token to use this method');
+    if (!_hasUserToken) {
+      throw TwitchMissingTokenException(TwitchClientType.user);
     }
 
     if (!commercialLengths.contains(length)) {
@@ -117,7 +126,7 @@ class TwitchClient {
       int first = 20,
       DateTime? startedAt,
       String type = 'overview_v2'}) async {
-    if (userToken == null) {
+    if (!_hasUserToken) {
       throw Exception('You need to provide a user token to use this method');
     }
 
@@ -189,7 +198,7 @@ class TwitchClient {
       int first = 20,
       DateTime? startedAt,
       String type = 'overview_v2'}) async {
-    if (userToken == null) {
+    if (!_hasUserToken) {
       throw Exception('You need to provide a user token to use this method');
     }
 
@@ -249,7 +258,7 @@ class TwitchClient {
       String period = 'all',
       DateTime? startedAt,
       String? userId}) async {
-    if (userToken == null) {
+    if (!_hasUserToken) {
       throw Exception('You need to provide a user token to use this method');
     }
 
@@ -284,7 +293,7 @@ class TwitchClient {
   /// Retrieves the list of available Cheermotes, animated emotes to which viewers can assign Bits, to cheer in chat. Cheermotes returned are available throughout Twitch, in all Bits-enabled channels.
   /// [broadcasterId] The broadcaster's ID.
   Future<TwitchResponse> getCheermotes({String? broadcasterId}) async {
-    if (userToken == null && appToken == null) {
+    if (!_hasAnyToken) {
       throw Exception(
           'You need to provide a user or app token to use this method');
     }
@@ -308,7 +317,7 @@ class TwitchClient {
   /// [first] Number of objects to return. Maximum: 100. Default: 20.
   Future<TwitchResponse> getExtensionTransactions(String extensionId,
       {List<String>? ids, String? after, int? first = 20}) async {
-    if (appToken == null) {
+    if (!_hasAppToken) {
       throw Exception('You need to provide an app token to use this method');
     }
 
@@ -347,7 +356,7 @@ class TwitchClient {
   /// [broadcasterIds] A list of broadcaster ids (maximum 100, will be truncated otherwise).
   Future<TwitchResponse> getChannelInformation(
       List<String> broadcasterIds) async {
-    if (appToken == null && userToken == null) {
+    if (!_hasAppToken && !_hasUserToken) {
       throw Exception(
           'You need to provide an app or user token to use this method');
     }
@@ -386,7 +395,7 @@ class TwitchClient {
     String? title,
     int? delay,
   }) async {
-    if (userToken == null) {
+    if (!_hasUserToken) {
       throw Exception('You need to provide a user token to use this method');
     }
 
@@ -428,7 +437,7 @@ class TwitchClient {
   /// Gets a list of users who have editor permissions for a specific channel.
   /// [broadcasterId] The broadcaster's ID.
   Future<TwitchResponse> getChannelEditors(String broadcasterId) async {
-    if (userToken == null) {
+    if (!_hasUserToken) {
       throw Exception('You need to provide a user token to use this method');
     }
 
@@ -472,7 +481,7 @@ class TwitchClient {
     int? globalCooldownSeconds,
     bool? shouldRedemptionSkipRequestQueue = false,
   }) async {
-    if (userToken == null) {
+    if (!_hasUserToken) {
       throw Exception('You need to provide a user token to use this method');
     }
 
@@ -558,7 +567,7 @@ class TwitchClient {
   /// [id] The ID of the Custom Reward to delete.
   Future<TwitchResponse> deleteCustomReward(
       String broadcasterId, String id) async {
-    if (userToken == null) {
+    if (!_hasUserToken) {
       throw Exception('You need to provide a user token to use this method');
     }
 
@@ -582,7 +591,7 @@ class TwitchClient {
   /// [onlyManageableRewards] When set to true, only returns custom rewards that the calling [clientId] can manage.
   Future<TwitchResponse> getCustomReward(String broadcasterId,
       {String? id, bool? onlyManageableRewards = true}) async {
-    if (userToken == null) {
+    if (!_hasUserToken) {
       throw Exception('You need to provide a user token to use this method');
     }
 
@@ -618,7 +627,7 @@ class TwitchClient {
       String? sort = 'OLDEST',
       String? after,
       int? first = 20}) async {
-    if (userToken == null) {
+    if (!_hasUserToken) {
       throw Exception('You need to provide a user token to use this method');
     }
 
@@ -690,7 +699,7 @@ class TwitchClient {
     bool? isPaused,
     bool? shouldRedemptionSkipRequestQueue = false,
   }) async {
-    if (userToken == null) {
+    if (!_hasUserToken) {
       throw Exception('You need to provide a user token to use this method');
     }
 
@@ -784,7 +793,7 @@ class TwitchClient {
   ///
   Future<TwitchResponse> updateCustomRewardRedemptions(
       String id, String broadcasterId, String rewardId, String status) async {
-    if (userToken == null) {
+    if (!_hasUserToken) {
       throw Exception('You need to provide a user token to use this method');
     }
 
@@ -849,7 +858,7 @@ class TwitchClient {
   /// NOTE: With the exception of custom follower emotes, users may use custom emotes in any Twitch chat.
   /// [broadcasterId] The broadcaster's ID.
   Future<TwitchResponse> getChannelEmotes(String broadcasterId) async {
-    if (userToken == null && appToken == null) {
+    if (!_hasAnyToken) {
       throw Exception(
           'You need to provide a user or app token to use this method');
     }
@@ -864,7 +873,7 @@ class TwitchClient {
   /// Gets all [global emotes](https://www.twitch.tv/creatorcamp/en/learn-the-basics/emotes/).
   /// Global emotes are Twitch-created emoticons that users can use in any Twitch chat.
   Future<TwitchResponse> getGlobalEmotes() async {
-    if (userToken == null && appToken == null) {
+    if (!_hasAnyToken) {
       throw Exception(
           'You need to provide a user or app token to use this method');
     }
@@ -880,7 +889,7 @@ class TwitchClient {
   /// An emote set groups emotes that have a similar context. For example, Twitch places all the subscriber emotes that a broadcaster uploads for their channel in the same emote set.
   /// [emoteSetIds] An ID that identifies the emote set. Include the parameter for each emote set you want to get. Maximum 25 or will be truncated.
   Future<TwitchResponse> getEmoteSets(List<String> emoteSetIds) async {
-    if (userToken == null && appToken == null) {
+    if (!_hasAnyToken) {
       throw Exception(
           'You need to provide a user or app token to use this method');
     }
@@ -912,7 +921,7 @@ class TwitchClient {
   /// This includes subscriber badges and Bit badges.
   /// [broadcasterId] The broadcaster's ID.
   Future<TwitchResponse> getChannelChatBadges(String broadcasterId) async {
-    if (userToken == null && appToken == null) {
+    if (!_hasAnyToken) {
       throw Exception(
           'You need to provide a user or app token to use this method');
     }
@@ -927,7 +936,7 @@ class TwitchClient {
 
   /// Gets a list of chat badges that can be used in chat for any channel.
   Future<TwitchResponse> getGlobalChatBadges() async {
-    if (userToken == null && appToken == null) {
+    if (!_hasAnyToken) {
       throw Exception(
           'You need to provide a user or app token to use this method');
     }
@@ -946,7 +955,7 @@ class TwitchClient {
   /// If the broadcaster wants to get their own settings (instead of having the moderator do it), set this parameter to the broadcaster’s ID, too.
   Future<TwitchResponse> getChatSettings(
       String broadcasterId, String moderatorId) async {
-    if (userToken == null && appToken == null) {
+    if (!_hasAnyToken) {
       throw Exception(
           'You need to provide a user or app token to use this method');
     }
@@ -987,6 +996,10 @@ class TwitchClient {
       int? slowModeWaitTime = 30,
       bool? subscriberMode = false,
       bool? uniqueChatMode = false}) async {
+    if (!_hasUserToken) {
+      throw Exception('You need to provide a user token to use this method');
+    }
+
     final queryParams = {
       'broadcaster_id': broadcasterId,
       'moderator_id': moderatorId
@@ -1028,7 +1041,8 @@ class TwitchClient {
     };
 
     final response = await _client.patch(url,
-        headers: _createHeaders(), body: json.encode(bodyParams));
+        headers: _createHeaders(clientType: TwitchClientType.user),
+        body: json.encode(bodyParams));
 
     return _handleResponse(response);
   }
@@ -1039,6 +1053,10 @@ class TwitchClient {
   /// [hasDelay] If false, the clip is captured from the live stream when the API is called
   Future<TwitchResponse> createClip(String broadcasterId,
       {bool? hasDelay = false}) async {
+    if (!_hasUserToken) {
+      throw Exception('You need to provide a user token to use this method');
+    }
+
     final queryParams = <String, String>{
       'broadcaster_id': broadcasterId,
       'has_delay': hasDelay.toString()
@@ -1046,7 +1064,8 @@ class TwitchClient {
 
     final url = formatUrl('/clips', queryParameters: queryParams);
 
-    final response = await _client.post(url, headers: _createHeaders());
+    final response = await _client.post(url,
+        headers: _createHeaders(clientType: TwitchClientType.user));
 
     return _handleResponse(response);
   }
@@ -1068,6 +1087,11 @@ class TwitchClient {
       DateTime? endedAt,
       int? first = 20,
       DateTime? startedAt}) async {
+    if (!_hasAnyToken) {
+      throw Exception(
+          'You need to provide a user or app token to use this method');
+    }
+
     if (ids.isEmpty) {
       throw ArgumentError('ids must not be empty');
     }
@@ -1103,6 +1127,280 @@ class TwitchClient {
     final url = formatUrl('/clips', queryParameters: queryParams);
 
     final response = await _client.get(url, headers: _createHeaders());
+
+    return _handleResponse(response);
+  }
+
+  /// Gets the status of one or more provided codes
+  /// [codes] One or more codes to check. Maximum 20.
+  /// [userId] Represents a numeric Twitch user ID. The user account which is going to receive the entitlement associated with the code.
+  Future<TwitchResponse> getCodeStatus(
+      List<String> codes, String userId) async {
+    if (!_hasAppToken) {
+      throw TwitchMissingTokenException(TwitchClientType.app);
+    }
+
+    if (codes.isEmpty) {
+      throw ArgumentError('codes must not be empty');
+    }
+
+    if (codes.length > 20) {
+      codes = codes.sublist(0, 20);
+    }
+
+    final queryParams = <String, String>{
+      ...?codes.isNotEmpty
+          ? {
+              for (var e in codes.map((code) => MapEntry('code', code)))
+                'code': e.value
+            }
+          : null,
+      'user_id': userId
+    };
+
+    final url = formatUrl('/entitlements/codes', queryParameters: queryParams);
+
+    final response = await _client.get(url,
+        headers: _createHeaders(clientType: TwitchClientType.app));
+
+    return _handleResponse(response);
+  }
+
+  /// Gets a list of entitlements for a given organization that have been granted to a game, user, or both.
+  /// [id] Unique identifier of the entitlement.
+  /// [userId] A Twitch user ID.
+  /// [gameId] A Twitch game ID.
+  /// [fulfillmentStatus] 	An optional fulfillment status used to filter entitlements. Valid values are "CLAIMED" or "FULFILLED".
+  /// [after] The cursor used to fetch the next page of data.
+  /// [first] Maximum number of entitlements to return.
+  Future<TwitchResponse> getDropsEntitlements(
+      {String? id,
+      String? userId,
+      String? gameId,
+      String? fulfillmentStatus,
+      String? after,
+      int? first = 20}) async {
+    if (!_hasAnyToken) {
+      throw Exception(
+          'You need to provide a user or app token to use this method');
+    }
+
+    if (fulfillmentStatus != null &&
+        !fulfillmentStatusValues.contains(fulfillmentStatus.toUpperCase())) {
+      throw ArgumentError(
+          'fulfillmentStatus must be one of ${fulfillmentStatusValues.join(', ')}');
+    }
+
+    if (first != null && first > 1000) {
+      first = 1000;
+    }
+
+    final queryParams = <String, String>{
+      ...?id != null ? {'id': id} : null,
+      ...?userId != null ? {'user_id': userId} : null,
+      ...?gameId != null ? {'game_id': gameId} : null,
+      ...?fulfillmentStatus != null
+          ? {'fulfillment_status': fulfillmentStatus}
+          : null,
+      ...?after != null ? {'after': after} : null,
+      ...?first != null ? {'first': first.toString()} : null,
+    };
+
+    final url = formatUrl('/entitlements/drops', queryParameters: queryParams);
+
+    final response = await _client.get(url, headers: _createHeaders());
+
+    return _handleResponse(response);
+  }
+
+  /// Updates the [fulfillmentStatus] on a set of Drops entitlements, specified by their [entitlementIds].
+  /// [entitlementIds] One or more entitlement IDs. Maximum 100
+  /// [fulfillmentStatus] The fulfillment status to set.
+  Future<TwitchResponse> updateDropsEntitlemets({
+    List<String>? entitlementIds,
+    String? fulfillmentStatus,
+  }) async {
+    if (!_hasAnyToken) {
+      throw Exception(
+          'You need to provide a user or app token to use this method');
+    }
+
+    if (fulfillmentStatus != null &&
+        !fulfillmentStatusValues.contains(fulfillmentStatus.toUpperCase())) {
+      throw ArgumentError(
+          'fulfillmentStatus must be one of ${fulfillmentStatusValues.join(', ')}');
+    }
+
+    if (entitlementIds != null) {
+      if (entitlementIds.isEmpty) {
+        throw ArgumentError('entitlementIds must not be empty');
+      }
+
+      if (entitlementIds.length > 100) {
+        entitlementIds = entitlementIds.sublist(0, 100);
+      }
+    }
+
+    final bodyParams = {
+      ...?entitlementIds != null ? {'entitlement_ids': entitlementIds} : null,
+      ...?fulfillmentStatus != null
+          ? {'fulfillment_status': fulfillmentStatus}
+          : null,
+    };
+
+    final url = formatUrl('/entitlements/drops');
+
+    final response =
+        await _client.patch(url, body: bodyParams, headers: _createHeaders());
+
+    return _handleResponse(response);
+  }
+
+  /// Redeems one or more redemption codes. Redeeming a code credits the user’s account with the entitlement associated with the code.
+  /// For example, a Bits reward earned when playing a game.
+  /// [codes] One or more redemption codes. Maximum 20.
+  /// [userId] The ID of the user that owns the redemption code to redeem.
+  Future<TwitchResponse> redeemCode(List<String> codes, String userId) async {
+    if (!_hasAppToken) {
+      throw TwitchMissingTokenException(TwitchClientType.app);
+    }
+
+    if (codes.isEmpty) {
+      throw ArgumentError('codes must not be empty');
+    }
+
+    if (codes.length > 20) {
+      codes = codes.sublist(0, 20);
+    }
+
+    final queryParams = <String, String>{
+      ...{
+        for (var e in codes.map((code) => MapEntry('code', code)))
+          'code': e.value
+      },
+      'user_id': userId
+    };
+
+    final url = formatUrl('/entitlements/codes', queryParameters: queryParams);
+
+    final response = await _client.post(url,
+        headers: _createHeaders(clientType: TwitchClientType.app));
+
+    return _handleResponse(response);
+  }
+
+  /// Gets the specified configuration segment from the specified extension.
+  /// [broadcasterId] The ID of the broadcaster for the configuration returned. This parameter is required if you set the segment parameter to broadcaster or developer. Do not specify this parameter if you set segment to global.
+  /// [extensionId] The ID of the extension for the configuration returned. This parameter is required if you set the segment parameter to extension. Do not specify this parameter if you set segment to global.
+  /// [segments] The segment of the configuration to return. Valid values are broadcaster, global, or developer.
+  Future<TwitchResponse> getExtensionCongiurationSegment(String jwt,
+      String? broadcasterId, String extensionId, List<String> segments) async {
+    if (jwt.isEmpty) {
+      throw ArgumentError('jwt must not be empty');
+    }
+
+    if (extensionId.isEmpty) {
+      throw ArgumentError('extensionId must not be empty');
+    }
+
+    if (segments.isEmpty) {
+      throw ArgumentError('segments must not be empty');
+    }
+
+    segments = segments.map((s) => s.toLowerCase()).toList();
+
+    if (!segments.every((element) => extensionsSegments.contains(element))) {
+      throw ArgumentError(
+          'segments must be one of ${extensionsSegments.join(', ')}');
+    }
+
+    if (broadcasterId != null) {
+      if (broadcasterId.isEmpty) {
+        throw ArgumentError('broadcasterId must not be empty');
+      }
+
+      if (segments.contains('broadcaster') || segments.contains('developer')) {
+        if (broadcasterId.isEmpty) {
+          throw ArgumentError(
+              'broadcasterId must not be empty if segments contains broadcaster or developer');
+        }
+      }
+    }
+
+    final queryParams = <String, String>{
+      ...!segments.contains('global') && broadcasterId != null
+          ? {'broadcaster_id': broadcasterId}
+          : {},
+      'extension_id': extensionId,
+      ...{
+        for (var segment
+            in segments.map((segment) => MapEntry('segment', segment)))
+          'segment': segment.value
+      },
+    };
+
+    final url =
+        formatUrl('/extensions/configurations', queryParameters: queryParams);
+
+    final response = await _client.get(url, headers: _createHeadersJWT(jwt));
+
+    return _handleResponse(response);
+  }
+
+  /// Sets a single configuration [segment] of any type.
+  /// The [segment] type is specified as a body parameter.
+  /// [broadcasterId] ID for the Extension which the configuration is for.
+  /// [extensionId] ID for the Extension which the configuration is for.
+  /// [segment] The segment of the configuration to set.
+  /// [content] The content of the configuration to set.
+  /// [version] The version of the configuration to set.
+  Future<TwitchResponse> setExtensionConfigurationSegment(
+      String jwt, String extensionId, String segment,
+      {String? broadcasterId, String? content, String? version}) async {
+    if (jwt.isEmpty) {
+      throw ArgumentError('jwt must not be empty');
+    }
+
+    if (extensionId.isEmpty) {
+      throw ArgumentError('extensionId must not be empty');
+    }
+
+    if (segment.isEmpty) {
+      throw ArgumentError('segment must not be empty');
+    }
+
+    segment = segment.toLowerCase();
+
+    if (!extensionsSegments.contains(segment)) {
+      throw ArgumentError(
+          'segment must be one of ${extensionsSegments.join(', ')}');
+    }
+
+    if (broadcasterId != null) {
+      if (broadcasterId.isEmpty) {
+        throw ArgumentError('broadcasterId must not be empty');
+      }
+
+      if (segment == 'broadcaster' || segment == 'developer') {
+        if (broadcasterId.isEmpty) {
+          throw ArgumentError(
+              'broadcasterId must not be empty if segment contains broadcaster or developer');
+        }
+      }
+    }
+
+    final bodyParams = {
+      'extension_id': extensionId,
+      'segment': segment,
+      ...?broadcasterId != null ? {'broadcaster_id': broadcasterId} : null,
+      ...?content != null ? {'content': content} : null,
+      ...?version != null ? {'version': version} : null,
+    };
+
+    final url = formatUrl('/extensions/configurations');
+
+    final response = await _client.put(url,
+        body: bodyParams, headers: _createHeadersJWT(jwt));
 
     return _handleResponse(response);
   }
@@ -1160,21 +1458,21 @@ class TwitchClient {
 
     switch (clientType) {
       case TwitchClientType.app:
-        if (appToken == null) {
+        if (!_hasAppToken) {
           throw ArgumentError('appToken must be specified');
         }
 
         token = appToken!;
         break;
       case TwitchClientType.user:
-        if (userToken == null) {
+        if (!_hasUserToken) {
           throw ArgumentError('userToken must be specified');
         }
 
         token = userToken!;
         break;
-      case TwitchClientType.none:
-        if (appToken == null && userToken == null) {
+      case TwitchClientType.any:
+        if (!_hasAppToken && !_hasUserToken) {
           throw ArgumentError('Either appToken or userToken must be specified');
         }
 
@@ -1195,6 +1493,15 @@ class TwitchClient {
     };
   }
 
+  /// Create headers for the request using a provided JWT header.
+  _createHeadersJWT(String jwt) {
+    return {
+      'Client-ID': clientId,
+      'Authorization': 'Bearer $jwt',
+      'Content-Type': 'application/json',
+    };
+  }
+
   /// Handle response error resolution
   Future<TwitchResponse> _handleResponse(Response response) async {
     switch (response.statusCode) {
@@ -1202,17 +1509,12 @@ class TwitchClient {
       case 204:
         return TwitchResponse.fromResponse(response);
       case 400:
-        throw Exception('Bad Request');
       case 401:
-        throw Exception('Unauthorized');
       case 403:
-        throw Exception('Forbidden');
       case 429:
-        throw TwitchApiRateLimitedException(response);
       case 404:
-        throw TwitchNotFoundException(response);
       case 500:
-        throw Exception('Internal Server Error');
+        throw TwitchResponseException.fromResponse(response);
       default:
         throw Exception('Unexpected status code: ${response.statusCode}');
     }

@@ -6,5 +6,5 @@ library twitch_dart;
 export 'src/twitch_client.dart';
 
 export 'src/twitch_constants.dart';
-export 'src/exceptions/twitch_api_rate_limited_exception.dart';
-export 'src/exceptions/twitch_not_found_exception.dart';
+export 'src/twitch_response.dart';
+export 'src/exceptions/twitch_response_exception.dart';

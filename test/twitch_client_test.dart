@@ -1,5 +1,5 @@
 import 'package:dotenv/dotenv.dart';
-import 'package:twitch_dart/src/twitch_response.dart';
+import 'package:twitch_dart/src/exceptions/twitch_missing_token_exception.dart';
 import 'package:twitch_dart/twitch_dart.dart';
 import 'package:test/test.dart';
 
@@ -14,6 +14,14 @@ void main() {
       final token = env['APP_ACCESS_TOKEN']!;
 
       client = TwitchClient(clientId, appToken: token);
+    });
+
+    test('Start commercial', () async {
+      try {
+        await client.startCommercial('test', 30);
+      } catch (e) {
+        expect(e, isA<TwitchMissingTokenException>());
+      }
     });
 
     test('Get Extension Analytics', () async {

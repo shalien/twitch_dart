@@ -23,3 +23,9 @@ List<String> statusCustomRewardRedemption = [
 ];
 
 List<int> nonModeratorChatDelayDurations = [2, 4, 6];
+
+///
+List<String> fulfillmentStatusValues = ['FULFILLED', 'CANCELED'];
+
+///
+List<String> extensionsSegments = ['broadcaster', 'developer', 'global'];
