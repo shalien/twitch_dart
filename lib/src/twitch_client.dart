@@ -1,12 +1,24 @@
 import 'dart:convert';
 import 'dart:core';
 
+import 'package:http/http.dart';
+
 import 'exceptions/twitch_api_rate_limited_exception.dart';
 import 'exceptions/twitch_not_found_exception.dart';
 import 'twitch_constants.dart';
 import 'twitch_response.dart';
 
-import 'package:http/http.dart' as http;
+/// Represent the state of the TwitchClient
+enum TwitchClientType {
+  /// Request will use the app token
+  app,
+
+  /// Request will use the oauth token
+  user,
+
+  /// Request will use the oauth token if available, otherwise the app token
+  none,
+}
 
 /// Allow to connect to the twitch api using a [clientId] and a [appToken].
 /// The [appToken] can be a appAccessToken or a userAccessToken or a OAuthAccessToken.
@@ -20,23 +32,75 @@ class TwitchClient {
   /// The OAuth token used in the request.
   final String? userToken;
 
-  TwitchClient(this.clientId, {this.appToken, this.userToken});
+  /// Allow to reuse the same client for each subsequent request.
+  final Client _client = Client();
+
+  /// The type of the client.
+  final TwitchClientType type;
+
+  /// Internal type for the context switching
+  TwitchClientType _internalType;
+
+  /// Will create a new [TwitchClient] with the [clientId] and the [appToken] or/and [userToken].
+  /// if both [appToken] and [userToken] are null, an exception will be raised.
+  /// [type] Allow to force switching request to use either [TwitchClientType.app] or [TwitchClientType.user] by default.
+  /// If [TwitchClientType.none] is used, the client will use the [userToken] if available, otherwise the [appToken].
+  TwitchClient(this.clientId,
+      {this.appToken, this.userToken, this.type = TwitchClientType.none})
+      : _internalType = type {
+    if (appToken == null && userToken == null) {
+      throw ArgumentError('You must provide an appToken or a userToken');
+    }
+
+    if (type == TwitchClientType.app && appToken == null) {
+      throw ArgumentError(
+          'You must provide an appToken if you use the app type', 'appToken');
+    }
+
+    if (type == TwitchClientType.user && userToken == null) {
+      throw ArgumentError(
+          'You must provide an userToken if you use the user type',
+          'userToken');
+    }
+  }
+
+  /// Allow to use the [appToken] for the next request.
+  /// If the [appToken] is null, an exception will be raised.
+  TwitchClient useAppToken() {
+    _internalType = TwitchClientType.app;
+    return this;
+  }
+
+  /// Allow to use the [userToken] for the next request.
+  /// If the [userToken] is null, an exception will be raised.
+  TwitchClient useUserToken() {
+    _internalType = TwitchClientType.user;
+    return this;
+  }
 
   /// Starts a commercial on a specified channel.
   /// [broadcasterId] is the channel ID to start the commercial on.
   /// Desired [length] of the commercial in seconds. Valid options are 30, 60, 90, 120, 150, 180.
   Future<TwitchResponse> startCommercial(
       String broadcasterId, int length) async {
+    if (userToken == null) {
+      throw Exception('You need to provide a user token to use this method');
+    }
+
     if (!commercialLengths.contains(length)) {
       throw ArgumentError(
           'Length must be one of ${commercialLengths.join(', ')}');
     }
 
-    final url = Uri.parse(createUrl('/channels/commercial'));
-    final body = {'broadcaster_id': broadcasterId, 'length': length.toString()};
+    final url = formatUrl('/channels/commercial');
+    final bodyParams = {
+      'broadcaster_id': broadcasterId,
+      'length': length.toString()
+    };
 
-    final response =
-        await http.post(url, headers: _createHeaders(), body: body);
+    final response = await _client.post(url,
+        headers: _createHeaders(clientType: TwitchClientType.user),
+        body: bodyParams);
 
     return _handleResponse(response);
   }
@@ -53,19 +117,23 @@ class TwitchClient {
       int first = 20,
       DateTime? startedAt,
       String type = 'overview_v2'}) async {
+    if (userToken == null) {
+      throw Exception('You need to provide a user token to use this method');
+    }
+
     if (endedAt != null && startedAt == null) {
       throw ArgumentError('If endedAt is set, startedAt must be set too');
     } else if (endedAt == null && startedAt != null) {
       throw ArgumentError('If startedAt is set, endedAt must be set too');
     }
 
-    final params = <String, String>{
+    final queryParams = <String, String>{
       'first': (first > 100 ? 100 : first).toString(),
       'type': type,
     };
 
     if (extensionId != null) {
-      params['extension_id'] = extensionId;
+      queryParams['extension_id'] = extensionId;
     } else {
       /// Starting date/time for returned reports, in RFC3339 format
       /// with the hours, minutes, and seconds zeroed out and the UTC timezone: YYYY-MM-DDT00:00:00Z
@@ -75,7 +143,7 @@ class TwitchClient {
           throw ArgumentError('startedAt must be on or after January 31, 2018');
         }
 
-        params['started_at'] =
+        queryParams['started_at'] =
             DateTime(startedAt.year, startedAt.month, startedAt.day, 0, 0, 0)
                 .toUtc()
                 .toIso8601String();
@@ -84,7 +152,7 @@ class TwitchClient {
       /// Ending date/time for returned reports, in RFC3339 format
       /// with the hours, minutes, and seconds zeroed out and the UTC timezone: YYYY-MM-DDT00:00:00Z
       if (endedAt != null) {
-        params['ended_at'] =
+        queryParams['ended_at'] =
             DateTime(endedAt.year, endedAt.month, endedAt.day, 0, 0, 0)
                 .toUtc()
                 .toIso8601String();
@@ -92,14 +160,15 @@ class TwitchClient {
 
       /// This applies only to queries without [extensionId].
       if (after != null) {
-        params['after'] = after;
+        queryParams['after'] = after;
       }
     }
 
-    final url = Uri.parse(createUrl('/analytics/extensions?') +
-        params.entries.map((e) => '${e.key}=${e.value}').join('&'));
+    final url =
+        formatUrl('/analytics/extensions', queryParameters: queryParams);
 
-    final response = await http.get(url, headers: _createHeaders());
+    final response = await _client.get(url,
+        headers: _createHeaders(clientType: TwitchClientType.user));
 
     return _handleResponse(response);
   }
@@ -120,19 +189,23 @@ class TwitchClient {
       int first = 20,
       DateTime? startedAt,
       String type = 'overview_v2'}) async {
+    if (userToken == null) {
+      throw Exception('You need to provide a user token to use this method');
+    }
+
     if (endedAt != null && startedAt == null) {
       throw ArgumentError('If endedAt is set, startedAt must be set too');
     } else if (endedAt == null && startedAt != null) {
       throw ArgumentError('If startedAt is set, endedAt must be set too');
     }
 
-    final params = <String, String>{
+    final queryParams = <String, String>{
       'first': (first > 100 ? 100 : first).toString(),
       'type': type,
     };
 
     if (gameId != null) {
-      params['game_id'] = gameId;
+      queryParams['game_id'] = gameId;
     } else {
       /// Starting date/time for returned reports, in RFC3339 format
       /// with the hours, minutes, and seconds zeroed out and the UTC timezone: YYYY-MM-DDT00:00:00Z
@@ -142,7 +215,7 @@ class TwitchClient {
           throw ArgumentError('startedAt must be on or after January 31, 2018');
         }
 
-        params['started_at'] =
+        queryParams['started_at'] =
             DateTime(startedAt.year, startedAt.month, startedAt.day, 0, 0, 0)
                 .toUtc()
                 .toIso8601String();
@@ -151,7 +224,7 @@ class TwitchClient {
       /// Ending date/time for returned reports, in RFC3339 format
       /// with the hours, minutes, and seconds zeroed out and the UTC timezone: YYYY-MM-DDT00:00:00Z
       if (endedAt != null) {
-        params['ended_at'] =
+        queryParams['ended_at'] =
             DateTime(endedAt.year, endedAt.month, endedAt.day, 0, 0, 0)
                 .toUtc()
                 .toIso8601String();
@@ -159,14 +232,13 @@ class TwitchClient {
 
       /// This applies only to queries without [extensionId].
       if (after != null) {
-        params['after'] = after;
+        queryParams['after'] = after;
       }
     }
 
-    final url = Uri.parse(createUrl('/analytics/games?') +
-        params.entries.map((e) => '${e.key}=${e.value}').join('&'));
-
-    final response = await http.get(url, headers: _createHeaders());
+    final url = formatUrl('/analytics/games', queryParameters: queryParams);
+    final response = await _client.get(url,
+        headers: _createHeaders(clientType: TwitchClientType.user));
 
     return _handleResponse(response);
   }
@@ -177,30 +249,34 @@ class TwitchClient {
       String period = 'all',
       DateTime? startedAt,
       String? userId}) async {
+    if (userToken == null) {
+      throw Exception('You need to provide a user token to use this method');
+    }
+
     if (!periods.contains(period.toLowerCase())) {
       throw ArgumentError('Invalid period: $period');
     }
 
-    final params = <String, String>{
+    final queryParams = <String, String>{
       'count': (count > 100 ? 100 : count).toString(),
       'period': period.toLowerCase(),
     };
 
     if (startedAt != null) {
-      params['started_at'] =
+      queryParams['started_at'] =
           DateTime(startedAt.year, startedAt.month, startedAt.day, 0, 0, 0)
               .toUtc()
               .toIso8601String();
     }
 
     if (userId != null) {
-      params['user_id'] = userId;
+      queryParams['user_id'] = userId;
     }
 
-    final url = Uri.parse(createUrl('/bits/leaderboard?') +
-        params.entries.map((e) => '${e.key}=${e.value}').join('&'));
+    final url = formatUrl('/bits/leaderboard', queryParameters: queryParams);
 
-    final response = await http.get(url, headers: _createHeaders());
+    final response = await _client.get(url,
+        headers: _createHeaders(clientType: TwitchClientType.user));
 
     return _handleResponse(response);
   }
@@ -208,30 +284,61 @@ class TwitchClient {
   /// Retrieves the list of available Cheermotes, animated emotes to which viewers can assign Bits, to cheer in chat. Cheermotes returned are available throughout Twitch, in all Bits-enabled channels.
   /// [broadcasterId] The broadcaster's ID.
   Future<TwitchResponse> getCheermotes({String? broadcasterId}) async {
-    final params = <String, String>{
+    if (userToken == null && appToken == null) {
+      throw Exception(
+          'You need to provide a user or app token to use this method');
+    }
+
+    final queryParams = <String, String>{
       ...broadcasterId != null ? {'broadcaster_id': broadcasterId} : {},
     };
 
-    final url = Uri.parse(createUrl('/bits/cheermotes?') +
-        params.entries.map((e) => '${e.key}=${e.value}').join('&'));
+    final url = formatUrl('/bits/cheermotes', queryParameters: queryParams);
 
-    final response = await http.get(url, headers: _createHeaders());
+    final response = await _client.get(url, headers: _createHeaders());
 
     return _handleResponse(response);
   }
 
   /// Gets the list of Extension transactions for a given Extension.
   /// This allows Extension back-end servers to fetch a list of transactions that have occurred for their Extension across all of Twitch.
-  /// A transaction is a record of a user exchanging Bits for an in-Extension digital good.
-  Future<TwitchResponse> getExtensionTransactions({String? extensionId}) async {
-    final params = <String, String>{
-      ...extensionId != null ? {'extension_id': extensionId} : {},
+  /// [extensionId] ID of the Extension to list transactions for.
+  /// [ids] Transaction IDs to look up. Can include multiple to fetch multiple transactions in a single request. Maximum 100
+  /// [after] Cursor used to fetch the next page of data.  If an [ids] is specified, it supersedes the cursor.
+  /// [first] Number of objects to return. Maximum: 100. Default: 20.
+  Future<TwitchResponse> getExtensionTransactions(String extensionId,
+      {List<String>? ids, String? after, int? first = 20}) async {
+    if (appToken == null) {
+      throw Exception('You need to provide an app token to use this method');
+    }
+
+    if (ids != null) {
+      if (ids.length > 100) {
+        ids = ids.sublist(0, 100);
+      }
+    }
+
+    if (first != null && first > 100) {
+      first = 100;
+    }
+
+    final queryParams = <String, String>{
+      'extension_id': extensionId,
+      ...ids != null
+          ? {
+              for (var id in ids.map((id) => MapEntry('id', id)))
+                id.key: id.value
+            }
+          : {},
+      ...ids != null ? {'first': first != null ? first.toString() : ''} : {},
+      'after': after ?? '',
     };
 
-    final url = Uri.parse(createUrl('/extensions/transactions?') +
-        params.entries.map((e) => '${e.key}=${e.value}').join('&'));
+    final url =
+        formatUrl('/extensions/transactions', queryParameters: queryParams);
 
-    final response = await http.get(url, headers: _createHeaders());
+    final response = await _client.get(url,
+        headers: _createHeaders(clientType: TwitchClientType.app));
 
     return _handleResponse(response);
   }
@@ -240,6 +347,11 @@ class TwitchClient {
   /// [broadcasterIds] A list of broadcaster ids (maximum 100, will be truncated otherwise).
   Future<TwitchResponse> getChannelInformation(
       List<String> broadcasterIds) async {
+    if (appToken == null && userToken == null) {
+      throw Exception(
+          'You need to provide an app or user token to use this method');
+    }
+
     if (broadcasterIds.isEmpty) {
       throw ArgumentError('broadcasterIds must not be empty');
     }
@@ -248,10 +360,15 @@ class TwitchClient {
       broadcasterIds = broadcasterIds.sublist(0, 100);
     }
 
-    final url = Uri.parse(createUrl(
-        '/channels?${broadcasterIds.map((e) => 'broadcaster_id=$e').join('&')}'));
+    final queryParams = <String, String>{
+      for (var broadcasterId in broadcasterIds
+          .map((broadcasterId) => MapEntry('broadcaster_id', broadcasterId)))
+        'broadcaster_id': broadcasterId.value
+    };
 
-    final response = await http.get(url, headers: _createHeaders());
+    final url = formatUrl('/channels', queryParameters: queryParams);
+
+    final response = await _client.get(url, headers: _createHeaders());
 
     return _handleResponse(response);
   }
@@ -269,6 +386,10 @@ class TwitchClient {
     String? title,
     int? delay,
   }) async {
+    if (userToken == null) {
+      throw Exception('You need to provide a user token to use this method');
+    }
+
     if (gameId != null &&
         broadcasterLanguage != null &&
         title != null &&
@@ -277,7 +398,11 @@ class TwitchClient {
           'At least one of gameId, broadcasterLanguage, title, delay should be set');
     }
 
-    final params = <String, String>{
+    final queryParams = <String, String>{
+      'broadcaster_id': broadcasterId,
+    };
+
+    final bodyParams = <String, String>{
       ...gameId != null ? {'game_id': gameId} : {},
       ...broadcasterLanguage != null
           ? {'broadcaster_language': broadcasterLanguage}
@@ -286,26 +411,32 @@ class TwitchClient {
       ...delay != null ? {'delay': delay.toString()} : {},
     };
 
-    if (params.isEmpty) {
+    if (bodyParams.isEmpty) {
       throw ArgumentError(
           'At least one of gameId, broadcasterLanguage, title, delay should be set');
     }
 
-    final url =
-        Uri.parse(createUrl('/channels/?broadcaster_id=$broadcasterId?'));
+    final url = formatUrl('/channels', queryParameters: queryParams);
 
-    final response = await http.patch(url,
-        headers: _createHeaders(), body: json.encode(params));
+    final response = await _client.patch(url,
+        headers: _createHeaders(clientType: TwitchClientType.user),
+        body: json.encode(bodyParams));
 
     return _handleResponse(response);
   }
 
   /// Gets a list of users who have editor permissions for a specific channel.
+  /// [broadcasterId] The broadcaster's ID.
   Future<TwitchResponse> getChannelEditors(String broadcasterId) async {
-    final url =
-        Uri.parse(createUrl('/channels/editors?broadcaster_id=$broadcasterId'));
+    if (userToken == null) {
+      throw Exception('You need to provide a user token to use this method');
+    }
 
-    final response = await http.get(url, headers: _createHeaders());
+    final url = formatUrl('/channels/editors',
+        queryParameters: {'broadcaster_id': broadcasterId});
+
+    final response = await _client.get(url,
+        headers: _createHeaders(clientType: TwitchClientType.user));
 
     return _handleResponse(response);
   }
@@ -341,8 +472,12 @@ class TwitchClient {
     int? globalCooldownSeconds,
     bool? shouldRedemptionSkipRequestQueue = false,
   }) async {
-    final url = Uri.parse(createUrl(
-        '/channels_points/custom_rewards?broadcaster_id=$broadcasterId'));
+    if (userToken == null) {
+      throw Exception('You need to provide a user token to use this method');
+    }
+
+    final url = formatUrl('/channels_points/custom_rewards',
+        queryParameters: {'broadcaster_id': broadcasterId});
 
     if (backgroundColor != null) {
       if (!backgroundColor.startsWith('#}')) {
@@ -372,7 +507,7 @@ class TwitchClient {
           'globalCooldownSeconds must be set if isGlobalCountdownEnabled is true');
     }
 
-    final params = <String, String>{
+    final bodyParams = <String, String>{
       'title': title,
       'cost': cost.toString(),
       ...prompt != null ? {'prompt': prompt} : {},
@@ -410,8 +545,9 @@ class TwitchClient {
           : {},
     };
 
-    final response = await http.post(url,
-        headers: _createHeaders(), body: json.encode(params));
+    final response = await _client.post(url,
+        headers: _createHeaders(clientType: TwitchClientType.user),
+        body: json.encode(bodyParams));
 
     return _handleResponse(response);
   }
@@ -422,10 +558,20 @@ class TwitchClient {
   /// [id] The ID of the Custom Reward to delete.
   Future<TwitchResponse> deleteCustomReward(
       String broadcasterId, String id) async {
-    final url = Uri.parse(createUrl(
-        '/channels_points/custom_rewards?broadcaster_id=$broadcasterId&id=$id'));
+    if (userToken == null) {
+      throw Exception('You need to provide a user token to use this method');
+    }
 
-    final response = await http.delete(url, headers: _createHeaders());
+    final queryParams = {
+      'broadcaster_id': broadcasterId,
+      'id': id,
+    };
+
+    final url = formatUrl('/channels_points/custom_rewards',
+        queryParameters: queryParams);
+
+    final response = await _client.delete(url,
+        headers: _createHeaders(clientType: TwitchClientType.user));
 
     return _handleResponse(response);
   }
@@ -436,17 +582,22 @@ class TwitchClient {
   /// [onlyManageableRewards] When set to true, only returns custom rewards that the calling [clientId] can manage.
   Future<TwitchResponse> getCustomReward(String broadcasterId,
       {String? id, bool? onlyManageableRewards = true}) async {
-    final params = <String, String>{
+    if (userToken == null) {
+      throw Exception('You need to provide a user token to use this method');
+    }
+
+    final queryParams = <String, String>{
       ...id != null ? {'id': id} : {},
       ...onlyManageableRewards != null
           ? {'only_manageable_rewards': onlyManageableRewards.toString()}
           : {},
     };
 
-    final url = Uri.parse(createUrl(
-        '/channels_points/custom_rewards?broadcaster_id=$broadcasterId${params.isNotEmpty ? '&${params.keys.join('&')}=${params.values.join('&')}' : ''}'));
+    final url = formatUrl('/channels_points/custom_rewards',
+        queryParameters: queryParams);
 
-    final response = await http.get(url, headers: _createHeaders());
+    final response = await _client.get(url,
+        headers: _createHeaders(clientType: TwitchClientType.user));
 
     return _handleResponse(response);
   }
@@ -467,6 +618,10 @@ class TwitchClient {
       String? sort = 'OLDEST',
       String? after,
       int? first = 20}) async {
+    if (userToken == null) {
+      throw Exception('You need to provide a user token to use this method');
+    }
+
     if (status != null &&
         !statusCustomRewardRedemption.contains(status.toUpperCase())) {
       throw ArgumentError(
@@ -482,7 +637,7 @@ class TwitchClient {
       first = 50;
     }
 
-    final params = <String, String>{
+    final queryParams = <String, String>{
       ...id != null ? {'id': id} : {},
       ...status != null ? {'status': status} : {},
       ...sort != null ? {'sort': sort} : {},
@@ -490,10 +645,11 @@ class TwitchClient {
       ...first != null ? {'first': first.toString()} : {},
     };
 
-    final url = Uri.parse(createUrl(
-        '/channels_points/custom_rewardsredemptions?broadcaster_id=$broadcasterId${params.isNotEmpty ? '&${params.keys.join('&')}=${params.values.join('&')}' : ''}'));
+    final url = formatUrl('/channels_points/custom_rewardsredemptions',
+        queryParameters: queryParams);
 
-    final response = await http.get(url, headers: _createHeaders());
+    final response = await _client.get(url,
+        headers: _createHeaders(clientType: TwitchClientType.user));
 
     return _handleResponse(response);
   }
@@ -534,6 +690,10 @@ class TwitchClient {
     bool? isPaused,
     bool? shouldRedemptionSkipRequestQueue = false,
   }) async {
+    if (userToken == null) {
+      throw Exception('You need to provide a user token to use this method');
+    }
+
     if (backgroundColor != null) {
       if (!backgroundColor.startsWith('#}')) {
         throw ArgumentError(
@@ -562,7 +722,7 @@ class TwitchClient {
           'globalCooldownSeconds must be set if isGlobalCountdownEnabled is true');
     }
 
-    final params = <String, String>{
+    final bodyParams = <String, String>{
       ...title != null ? {'title': title} : {},
       ...cost != null ? {'cost': cost.toString()} : {},
       ...prompt != null ? {'prompt': prompt} : {},
@@ -601,11 +761,17 @@ class TwitchClient {
           : {},
     };
 
-    final url = Uri.parse(createUrl(
-        '/channels_points/custom_rewards?broadcaster_id=$broadcasterId&id=$id'));
+    final queryParams = <String, String>{
+      'broadcaster_id': broadcasterId,
+      'id': id,
+    };
 
-    final response = await http.put(url,
-        headers: _createHeaders(), body: json.encode(params));
+    final url = formatUrl('/channels_points/custom_rewards',
+        queryParameters: queryParams);
+
+    final response = await _client.put(url,
+        headers: _createHeaders(clientType: TwitchClientType.user),
+        body: json.encode(bodyParams));
 
     return _handleResponse(response);
   }
@@ -618,16 +784,31 @@ class TwitchClient {
   ///
   Future<TwitchResponse> updateCustomRewardRedemptions(
       String id, String broadcasterId, String rewardId, String status) async {
+    if (userToken == null) {
+      throw Exception('You need to provide a user token to use this method');
+    }
+
     if (!statusCustomRewardRedemption.contains(status)) {
       throw ArgumentError(
           'status must be one of ${statusCustomRewardRedemption.join(', ')}');
     }
 
-    final url = Uri.parse(createUrl(
-        '/channel_points/custom_rewards/redemptions?broadcaster_id=$broadcasterId&id=$id&reward_id=$rewardId'));
+    final queryParams = <String, String>{
+      'broadcaster_id': broadcasterId,
+      'id': id,
+      'reward_id': rewardId,
+    };
 
-    final response = await http.put(url,
-        headers: _createHeaders(), body: json.encode({'status': status}));
+    final bodyParams = <String, String>{
+      'status': status,
+    };
+
+    final url = formatUrl('/channel_points/custom_rewards/redemptions',
+        queryParameters: queryParams);
+
+    final response = await _client.put(url,
+        headers: _createHeaders(clientType: TwitchClientType.user),
+        body: json.encode(bodyParams));
 
     return _handleResponse(response);
   }
@@ -638,17 +819,27 @@ class TwitchClient {
   /// [rewardId] ID of the Custom Reward the redemptions to be updated are for.
   /// [status] The status to set the redemptions to.
   Future<TwitchResponse> updateRedemptionStatus(
-      String id, String rewardId, String status) async {
+      String id, String broadcasterId, String rewardId, String status) async {
     if (!statusCustomRewardRedemption.contains(status)) {
       throw ArgumentError(
           'status must be one of ${statusCustomRewardRedemption.join(', ')}');
     }
 
-    final url = Uri.parse(createUrl(
-        '/channel_points/custom_rewards/redemptions?broadcaster_id=$id&reward_id=$rewardId'));
+    final queryParams = <String, String>{
+      'broadcaster_id': broadcasterId,
+      'id': id,
+      'reward_id': rewardId,
+    };
 
-    final response = await http.put(url,
-        headers: _createHeaders(), body: json.encode({'status': status}));
+    final bodyParams = <String, String>{
+      'status': status,
+    };
+
+    final url = formatUrl('/channel_points/custom_rewards/redemptions',
+        queryParameters: queryParams);
+
+    final response = await _client.put(url,
+        headers: _createHeaders(), body: json.encode(bodyParams));
 
     return _handleResponse(response);
   }
@@ -658,10 +849,14 @@ class TwitchClient {
   /// NOTE: With the exception of custom follower emotes, users may use custom emotes in any Twitch chat.
   /// [broadcasterId] The broadcaster's ID.
   Future<TwitchResponse> getChannelEmotes(String broadcasterId) async {
-    final url =
-        Uri.parse(createUrl('/chat/emotes?broadcaster_id=$broadcasterId'));
+    if (userToken == null && appToken == null) {
+      throw Exception(
+          'You need to provide a user or app token to use this method');
+    }
+    final url = formatUrl('/chat/emotes',
+        queryParameters: {'broadcaster_id': broadcasterId});
 
-    final response = await http.get(url, headers: _createHeaders());
+    final response = await _client.get(url, headers: _createHeaders());
 
     return _handleResponse(response);
   }
@@ -669,9 +864,14 @@ class TwitchClient {
   /// Gets all [global emotes](https://www.twitch.tv/creatorcamp/en/learn-the-basics/emotes/).
   /// Global emotes are Twitch-created emoticons that users can use in any Twitch chat.
   Future<TwitchResponse> getGlobalEmotes() async {
-    final url = Uri.parse(createUrl('/emotes/global'));
+    if (userToken == null && appToken == null) {
+      throw Exception(
+          'You need to provide a user or app token to use this method');
+    }
 
-    final response = await http.get(url, headers: _createHeaders());
+    final url = formatUrl('/emotes/global');
+
+    final response = await _client.get(url, headers: _createHeaders());
 
     return _handleResponse(response);
   }
@@ -680,6 +880,11 @@ class TwitchClient {
   /// An emote set groups emotes that have a similar context. For example, Twitch places all the subscriber emotes that a broadcaster uploads for their channel in the same emote set.
   /// [emoteSetIds] An ID that identifies the emote set. Include the parameter for each emote set you want to get. Maximum 25 or will be truncated.
   Future<TwitchResponse> getEmoteSets(List<String> emoteSetIds) async {
+    if (userToken == null && appToken == null) {
+      throw Exception(
+          'You need to provide a user or app token to use this method');
+    }
+
     if (emoteSetIds.isEmpty) {
       throw ArgumentError('emoteSetIds must not be empty');
     }
@@ -688,10 +893,17 @@ class TwitchClient {
       emoteSetIds = emoteSetIds.sublist(0, 25);
     }
 
-    final url = Uri.parse(createUrl(
-        '/chat/emotes/set/?ids=${emoteSetIds.map((id) => 'emote_set_id=$id').join('&')}'));
+    final queryParams = <String, String>{
+      ...{
+        for (var emoteSetId in emoteSetIds
+            .map((emoteSetId) => MapEntry('emote_set_id', emoteSetId)))
+          emoteSetId.key: emoteSetId.value,
+      }
+    };
 
-    final response = await http.get(url, headers: _createHeaders());
+    final url = formatUrl('/chat/emotes/set', queryParameters: queryParams);
+
+    final response = await _client.get(url, headers: _createHeaders());
 
     return _handleResponse(response);
   }
@@ -700,19 +912,29 @@ class TwitchClient {
   /// This includes subscriber badges and Bit badges.
   /// [broadcasterId] The broadcaster's ID.
   Future<TwitchResponse> getChannelChatBadges(String broadcasterId) async {
-    final url =
-        Uri.parse(createUrl('/chat/badges?broadcaster_id=$broadcasterId'));
+    if (userToken == null && appToken == null) {
+      throw Exception(
+          'You need to provide a user or app token to use this method');
+    }
 
-    final response = await http.get(url, headers: _createHeaders());
+    final url = formatUrl('/chat/badges',
+        queryParameters: {'broadcaster_id': broadcasterId});
+
+    final response = await _client.get(url, headers: _createHeaders());
 
     return _handleResponse(response);
   }
 
   /// Gets a list of chat badges that can be used in chat for any channel.
   Future<TwitchResponse> getGlobalChatBadges() async {
-    final url = Uri.parse(createUrl('/chat/badges/global'));
+    if (userToken == null && appToken == null) {
+      throw Exception(
+          'You need to provide a user or app token to use this method');
+    }
 
-    final response = await http.get(url, headers: _createHeaders());
+    final url = formatUrl('/chat/badges/global');
+
+    final response = await _client.get(url, headers: _createHeaders());
 
     return _handleResponse(response);
   }
@@ -724,10 +946,19 @@ class TwitchClient {
   /// If the broadcaster wants to get their own settings (instead of having the moderator do it), set this parameter to the broadcaster’s ID, too.
   Future<TwitchResponse> getChatSettings(
       String broadcasterId, String moderatorId) async {
-    final url = Uri.parse(createUrl(
-        '/chat/settings?broadcaster_id=$broadcasterId&moderator_id=$moderatorId'));
+    if (userToken == null && appToken == null) {
+      throw Exception(
+          'You need to provide a user or app token to use this method');
+    }
 
-    final response = await http.get(url, headers: _createHeaders());
+    final queryParams = <String, String>{
+      'broadcaster_id': broadcasterId,
+      'moderator_id': moderatorId,
+    };
+
+    final url = formatUrl('/chat/settings', queryParameters: queryParams);
+
+    final response = await _client.get(url, headers: _createHeaders());
 
     return _handleResponse(response);
   }
@@ -756,8 +987,12 @@ class TwitchClient {
       int? slowModeWaitTime = 30,
       bool? subscriberMode = false,
       bool? uniqueChatMode = false}) async {
-    final url = Uri.parse(createUrl(
-        '/chat/settings?broadcaster_id=$broadcasterId&moderator_id=$moderatorId'));
+    final queryParams = {
+      'broadcaster_id': broadcasterId,
+      'moderator_id': moderatorId
+    };
+
+    final url = formatUrl('/chat/settings', queryParameters: queryParams);
 
     if (nonModeratorChatDelayDuration != null &&
         !nonModeratorChatDelayDurations
@@ -772,7 +1007,7 @@ class TwitchClient {
       }
     }
 
-    final params = {
+    final bodyParams = {
       ...?emoteMode != null ? {'emote_mode': emoteMode} : null,
       ...?followerMode != null ? {'follower_mode': followerMode} : null,
       ...?followerModeDuration != null
@@ -792,8 +1027,8 @@ class TwitchClient {
       ...?uniqueChatMode != null ? {'unique_chat_mode': uniqueChatMode} : null,
     };
 
-    final response = await http.patch(url,
-        headers: _createHeaders(), body: json.encode(params));
+    final response = await _client.patch(url,
+        headers: _createHeaders(), body: json.encode(bodyParams));
 
     return _handleResponse(response);
   }
@@ -804,21 +1039,73 @@ class TwitchClient {
   /// [hasDelay] If false, the clip is captured from the live stream when the API is called
   Future<TwitchResponse> createClip(String broadcasterId,
       {bool? hasDelay = false}) async {
-    final url = Uri.parse(
-        createUrl('/clips?broacaster_id=$broadcasterId&has_delay=$hasDelay'));
+    final queryParams = <String, String>{
+      'broadcaster_id': broadcasterId,
+      'has_delay': hasDelay.toString()
+    };
 
-    final response = await http.post(url, headers: _createHeaders());
+    final url = formatUrl('/clips', queryParameters: queryParams);
+
+    final response = await _client.post(url, headers: _createHeaders());
 
     return _handleResponse(response);
   }
 
+  /// Gets clip information by clip [ids] (one or more), [broadcasterId] (one only), or [gameId] (one only).
+  /// Note: The clips service returns a maximum of 1000 clips.
+  /// [broadcasterId] ID of the broadcaster for whom clips are returned
+  /// [gameId] ID of the game for which clips are returned.
+  /// [ids] IDs of the clips to return. If superior to 100 will be truncated.
+  /// [after] Cursor for forward pagination: tells the server where to start fetching the next set of results, in a multi-page response.
+  /// [before] Cursor for backward pagination: tells the server where to start fetching the next set of results, in a multi-page response.
+  /// [first] The number of clips to return. Maximum 100.
+  /// [endedAt] Ending date/time for returned clips,  this is specified, [startedAt] also must be specified; otherwise, the time period is ignored.
+  /// [startedAt] Starting date/time for returned clips, this is specified, [endedAt] also must be specified; otherwise, the [endedAt] date/time will be 1 week after the [startedAt] value.
   Future<TwitchResponse> getClip(
       String broadcasterId, String gameId, List<String> ids,
       {String? after,
       String? before,
       DateTime? endedAt,
-      int? first,
-      DateTime? startedAt}) async {}
+      int? first = 20,
+      DateTime? startedAt}) async {
+    if (ids.isEmpty) {
+      throw ArgumentError('ids must not be empty');
+    }
+
+    if (ids.length > 100) {
+      ids = ids.sublist(0, 100);
+    }
+
+    if (first != null && first > 100) {
+      first = 100;
+    }
+
+    if (endedAt != null && startedAt == null) {
+      throw ArgumentError(
+          'startedAt must be specified if endedAt is specified');
+    }
+
+    final queryParams = <String, String>{
+      'broadcaster_id': broadcasterId,
+      'game_id': gameId,
+      ...?ids.isNotEmpty
+          ? {for (var e in ids.map((id) => MapEntry('id', id))) 'id': e.value}
+          : null,
+      ...?after != null ? {'after': after} : null,
+      ...?before != null ? {'before': before} : null,
+      ...?first != null ? {'first': first.toString()} : null,
+      ...?endedAt != null ? {'ended_at': endedAt.toIso8601String()} : null,
+      ...?startedAt != null
+          ? {'started_at': startedAt.toIso8601String()}
+          : null,
+    };
+
+    final url = formatUrl('/clips', queryParameters: queryParams);
+
+    final response = await _client.get(url, headers: _createHeaders());
+
+    return _handleResponse(response);
+  }
 
   /// Gets information about one or more specified Twitch users.
   /// Users are identified by optional user [ids] and/or [logins] name.
@@ -847,27 +1134,69 @@ class TwitchClient {
       throw ArgumentError('Maximum number of users is 100');
     }
 
-    final param = [
-      ...ids != null ? ids.map((e) => 'id=$e').toList() : [],
-      ...logins != null ? logins.map((e) => 'login=$e').toList() : [],
-    ];
+    final queryParams = <String, String>{
+      ...?ids != null
+          ? {for (var e in ids.map((id) => MapEntry('id', id))) 'id': e.value}
+          : null,
+      ...?logins != null
+          ? {
+              for (var e in logins.map((login) => MapEntry('login', login)))
+                'login': e.value
+            }
+          : null,
+    };
 
-    final url = Uri.parse(createUrl('users?${param.join('&')}'));
+    final url = formatUrl('/users', queryParameters: queryParams);
 
-    final response = await http.get(url, headers: _createHeaders());
+    final response = await _client.get(url, headers: _createHeaders());
 
     return _handleResponse(response);
   }
 
   /// Create the headers for the request.
-  Map<String, String> _createHeaders() => {
-        'Client-ID': clientId,
-        'Authorization': 'Bearer $appToken',
-        'Content-Type': 'application/json',
-      };
+  Map<String, String> _createHeaders({TwitchClientType? clientType}) {
+    String token;
+    clientType = clientType ?? _internalType;
+
+    switch (clientType) {
+      case TwitchClientType.app:
+        if (appToken == null) {
+          throw ArgumentError('appToken must be specified');
+        }
+
+        token = appToken!;
+        break;
+      case TwitchClientType.user:
+        if (userToken == null) {
+          throw ArgumentError('userToken must be specified');
+        }
+
+        token = userToken!;
+        break;
+      case TwitchClientType.none:
+        if (appToken == null && userToken == null) {
+          throw ArgumentError('Either appToken or userToken must be specified');
+        }
+
+        if (userToken != null) {
+          token = userToken!;
+        } else {
+          token = appToken!;
+        }
+        break;
+    }
+
+    _internalType = type;
+
+    return {
+      'Client-ID': clientId,
+      'Authorization': 'Bearer $token',
+      'Content-Type': 'application/json',
+    };
+  }
 
   /// Handle response error resolution
-  Future<TwitchResponse> _handleResponse(http.Response response) async {
+  Future<TwitchResponse> _handleResponse(Response response) async {
     switch (response.statusCode) {
       case 200:
       case 204:

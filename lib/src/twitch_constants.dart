@@ -2,7 +2,11 @@
 const apiBaseUrl = 'https://api.twitch.tv/helix/';
 
 /// Format the url
-String createUrl(String path) => '$apiBaseUrl$path';
+Uri formatUrl(String url, {Map<String, String>? queryParameters}) {
+  final uri = Uri.parse('$apiBaseUrl$url');
+  final query = queryParameters ?? {};
+  return uri.replace(queryParameters: query);
+}
 
 /// Allow commercial time
 List<int> commercialLengths = [30, 60, 90, 120, 150, 180];
