@@ -32,6 +32,9 @@ class TwitchClient {
   /// The OAuth token used in the request.
   final String? userToken;
 
+  /// JWT token used in some requests.
+  String? jwtToken;
+
   /// Allow to reuse the same client for each subsequent request.
   final Client _client = Client();
 
@@ -50,12 +53,19 @@ class TwitchClient {
   /// shorthand to check if the user token is usable
   bool get _hasUserToken => userToken != null;
 
+  /// shorthand to checkif the client has an usable jwt token
+  bool get hasJwtToken => jwtToken != null;
+
   /// Will create a new [TwitchClient] with the [clientId] and the [appToken] or/and [userToken].
   /// if both [appToken] and [userToken] are null, an exception will be raised.
   /// [type] Allow to force switching request to use either [TwitchClientType.app] or [TwitchClientType.user] by default.
   /// If [TwitchClientType.any] is used, the client will use the [userToken] if available, otherwise the [appToken].
+  /// A [jwtToken] can also be provided and will be use in the extensions management requests.
   TwitchClient(this.clientId,
-      {this.appToken, this.userToken, this.type = TwitchClientType.any})
+      {this.appToken,
+      this.userToken,
+      this.type = TwitchClientType.any,
+      String? jwtToken})
       : _internalType = type {
     if (!_hasAppToken && !_hasUserToken) {
       throw ArgumentError('You must provide an appToken or a userToken');
@@ -1293,9 +1303,9 @@ class TwitchClient {
   /// [broadcasterId] The ID of the broadcaster for the configuration returned. This parameter is required if you set the segment parameter to broadcaster or developer. Do not specify this parameter if you set segment to global.
   /// [extensionId] The ID of the extension for the configuration returned. This parameter is required if you set the segment parameter to extension. Do not specify this parameter if you set segment to global.
   /// [segments] The segment of the configuration to return. Valid values are broadcaster, global, or developer.
-  Future<TwitchResponse> getExtensionCongiurationSegment(String jwt,
+  Future<TwitchResponse> getExtensionCongiurationSegment(
       String? broadcasterId, String extensionId, List<String> segments) async {
-    if (jwt.isEmpty) {
+    if (!hasJwtToken) {
       throw ArgumentError('jwt must not be empty');
     }
 
@@ -1342,7 +1352,7 @@ class TwitchClient {
     final url =
         formatUrl('/extensions/configurations', queryParameters: queryParams);
 
-    final response = await _client.get(url, headers: _createHeadersJWT(jwt));
+    final response = await _client.get(url, headers: _createHeadersJWT());
 
     return _handleResponse(response);
   }
@@ -1355,9 +1365,9 @@ class TwitchClient {
   /// [content] The content of the configuration to set.
   /// [version] The version of the configuration to set.
   Future<TwitchResponse> setExtensionConfigurationSegment(
-      String jwt, String extensionId, String segment,
+      String extensionId, String segment,
       {String? broadcasterId, String? content, String? version}) async {
-    if (jwt.isEmpty) {
+    if (!hasJwtToken) {
       throw ArgumentError('jwt must not be empty');
     }
 
@@ -1399,8 +1409,8 @@ class TwitchClient {
 
     final url = formatUrl('/extensions/configurations');
 
-    final response = await _client.put(url,
-        body: bodyParams, headers: _createHeadersJWT(jwt));
+    final response =
+        await _client.put(url, body: bodyParams, headers: _createHeadersJWT());
 
     return _handleResponse(response);
   }
@@ -1494,10 +1504,14 @@ class TwitchClient {
   }
 
   /// Create headers for the request using a provided JWT header.
-  _createHeadersJWT(String jwt) {
+  Map<String, String> _createHeadersJWT() {
+    if (!hasJwtToken) {
+      throw ArgumentError('jwt must not be empty');
+    }
+
     return {
       'Client-ID': clientId,
-      'Authorization': 'Bearer $jwt',
+      'Authorization': 'Bearer $jwtToken',
       'Content-Type': 'application/json',
     };
   }
